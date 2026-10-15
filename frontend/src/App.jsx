@@ -41,13 +41,11 @@ export default function App() {
   const [lineItems, setLineItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorBanner, setErrorBanner] = useState("");
-  
-  // CSV Upload state
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
 
-  // In-flight action tracking (key: "approve-123", "reject-123", "ignore-456")
   const [activeActions, setActiveActions] = useState(new Set());
 
   const setActionRunning = (actionKey, isRunning) => {
@@ -82,7 +80,6 @@ export default function App() {
     loadData();
   }, [loadData]);
 
-  // Handle CSV Upload
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!selectedFile) return;
@@ -93,10 +90,8 @@ export default function App() {
       const { data } = await uploadCSV(selectedOrg, selectedFile);
       setUploadResult(data);
       setSelectedFile(null);
-      // Reset input element value
       const fileInput = document.getElementById("csv-file-input");
       if (fileInput) fileInput.value = "";
-      // Refresh transaction and line item lists
       await loadData();
     } catch (err) {
       setErrorBanner(err.message || "CSV upload failed.");
@@ -105,7 +100,6 @@ export default function App() {
     }
   };
 
-  // Handle Match Approve
   const handleApprove = async (matchId) => {
     const key = `approve-${matchId}`;
     setActionRunning(key, true);
@@ -120,7 +114,6 @@ export default function App() {
     }
   };
 
-  // Handle Match Reject
   const handleReject = async (matchId) => {
     const key = `reject-${matchId}`;
     setActionRunning(key, true);
@@ -135,7 +128,6 @@ export default function App() {
     }
   };
 
-  // Handle Ignore Transaction
   const handleIgnore = async (txnId) => {
     const key = `ignore-${txnId}`;
     setActionRunning(key, true);
@@ -150,7 +142,6 @@ export default function App() {
     }
   };
 
-  // Metrics calculations
   const totalCalled = lineItems.reduce((acc, li) => acc + parseFloat(li.amount_called || 0), 0);
   const totalFunded = lineItems.reduce((acc, li) => acc + parseFloat(li.amount_funded || 0), 0);
   const totalRemaining = totalCalled - totalFunded;
@@ -158,7 +149,6 @@ export default function App() {
 
   return (
     <div className="container">
-      {/* App Header */}
       <header className="app-header">
         <div className="brand">
           <div className="logo-badge">FF</div>
@@ -168,7 +158,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Organization Switcher */}
         <div className="org-selector-group" id="org-switcher">
           {ORGANIZATIONS.map((org) => (
             <button
@@ -184,7 +173,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Global Error Banner */}
       {errorBanner && (
         <div className="error-banner" id="error-banner">
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -195,7 +183,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Metrics Summary Bar */}
       <section className="metrics-grid">
         <div className="metric-card">
           <div className="metric-title">
@@ -250,7 +237,6 @@ export default function App() {
         </div>
       </section>
 
-      {/* CSV Upload Section */}
       <section className="dashboard-card" id="csv-upload-section">
         <div className="card-header">
           <div className="card-title-group">
@@ -302,7 +288,6 @@ export default function App() {
           </button>
         </form>
 
-        {/* CSV Upload Feedback / Error Display */}
         {uploadResult && (
           <div className="import-summary-banner" id="import-summary-banner">
             <div className="import-summary-stats">
@@ -332,7 +317,6 @@ export default function App() {
         )}
       </section>
 
-      {/* Line Items Overview Panel */}
       <section className="dashboard-card" id="line-items-panel">
         <div className="card-header">
           <div className="card-title-group">
@@ -393,7 +377,6 @@ export default function App() {
         )}
       </section>
 
-      {/* Transactions Table Section */}
       <section className="dashboard-card" id="transactions-section">
         <div className="card-header">
           <div className="card-title-group">
@@ -464,7 +447,6 @@ export default function App() {
                         </span>
                       </td>
                       <td>
-                        {/* If matches exist, list each proposed/approved match */}
                         {txn.matches && txn.matches.length > 0 ? (
                           txn.matches.map((match) => {
                             const isApproveRunning = activeActions.has(`approve-${match.id}`);

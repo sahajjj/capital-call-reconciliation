@@ -1,20 +1,12 @@
 from django.db import transaction
-from reconciliation.models import BankTransaction, Match
+from reconciliation.models import BankTransaction, LineItem, Match
 
 
 class ActionError(Exception):
-    """Raised when an action can't proceed (maps to 409 in the view)."""
     pass
 
 
 def approve_match(match_id, org):
-    """
-    Approve a match atomically:
-    - Lock the line item and transaction rows
-    - Verify the match is still actionable
-    - Update funded amount, line item status, transaction status
-    - Reject sibling matches on this transaction
-    """
     with transaction.atomic():
         try:
             match = (
@@ -23,7 +15,7 @@ def approve_match(match_id, org):
                 .get(pk=match_id, transaction__organization=org)
             )
         except Match.DoesNotExist:
-            return None  # 404
+            return None
 
         if match.status != "proposed":
             raise ActionError("Match is no longer proposed.")
@@ -32,31 +24,17 @@ def approve_match(match_id, org):
         if txn.status in ("reconciled", "ignored"):
             raise ActionError("Transaction is already reconciled or ignored.")
 
-        # lock both rows for the duration of this transaction
-        li = match.line_item.__class__.objects.select_for_update().get(
-            pk=match.line_item.pk
-        )
-        txn = match.transaction.__class__.objects.select_for_update().get(
-            pk=match.transaction.pk
-        )
+        li = LineItem.objects.select_for_update().get(pk=match.line_item_id)
+        txn = BankTransaction.objects.select_for_update().get(pk=match.transaction_id)
 
-        # re-check after locking (another request could have approved first)
         remaining = li.amount_called - li.amount_funded
         if txn.amount > remaining:
-            raise ActionError(
-                f"Amount {txn.amount} exceeds remaining {remaining}. "
-                f"Possibly already funded by another approval."
-            )
+            raise ActionError(f"Amount {txn.amount} exceeds remaining {remaining}.")
 
-        # update line item
         li.amount_funded += txn.amount
-        if li.amount_funded >= li.amount_called:
-            li.status = "funded"
-        else:
-            li.status = "partially_funded"
+        li.status = "funded" if li.amount_funded >= li.amount_called else "partially_funded"
         li.save()
 
-        # approve this match, reject siblings on same transaction
         match.status = "approved"
         match.save()
 
@@ -71,7 +49,6 @@ def approve_match(match_id, org):
 
 
 def reject_match(match_id, org):
-    """Reject a match. If no proposed matches remain, flag txn for review."""
     try:
         match = (
             Match.objects
@@ -88,8 +65,7 @@ def reject_match(match_id, org):
     match.save()
 
     txn = match.transaction
-    remaining_proposed = txn.matches.filter(status="proposed").count()
-    if remaining_proposed == 0:
+    if not txn.matches.filter(status="proposed").exists():
         txn.status = "needs_review"
         txn.review_reason = "All proposed matches were rejected."
         txn.save()
@@ -98,7 +74,6 @@ def reject_match(match_id, org):
 
 
 def ignore_transaction(txn_id, org):
-    """Ignore a transaction — only if it's suggested or needs_review."""
     try:
         txn = BankTransaction.objects.get(pk=txn_id, organization=org)
     except BankTransaction.DoesNotExist:
@@ -112,7 +87,5 @@ def ignore_transaction(txn_id, org):
     txn.status = "ignored"
     txn.save()
 
-    # reject all proposed matches
     txn.matches.filter(status="proposed").update(status="rejected")
-
     return txn

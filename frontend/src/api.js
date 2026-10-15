@@ -1,4 +1,3 @@
-// API helper for FundFlow
 const BASE_URL = "/api";
 
 export async function fetchTransactions(org) {

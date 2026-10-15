@@ -93,7 +93,6 @@ class BankTransaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        # same bank_reference can exist in different orgs
         constraints = [
             models.UniqueConstraint(
                 fields=["organization", "bank_reference"],

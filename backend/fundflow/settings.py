@@ -4,7 +4,6 @@ from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
 
-# Load .env from repo root (one level up from backend/)
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -57,8 +56,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "fundflow.wsgi.application"
 
-# Database — use DATABASE_URL for Postgres in production,
-# falls back to SQLite for local dev if not set.
 DATABASES = {
     "default": dj_database_url.config(
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
@@ -72,7 +69,6 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CORS — allow the Vite dev server
 CORS_ALLOWED_ORIGINS = os.environ.get(
     "CORS_ALLOWED_ORIGINS", "http://localhost:5173"
 ).split(",")

@@ -43,7 +43,6 @@ class TransactionImportView(APIView):
 
         result = import_csv(request.org, csv_file)
 
-        # if there are column errors, the whole import failed
         if result["imported"] == 0 and result["errors"]:
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
 

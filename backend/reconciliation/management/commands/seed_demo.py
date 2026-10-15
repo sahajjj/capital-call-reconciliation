@@ -1,7 +1,5 @@
 from decimal import Decimal
-
 from django.core.management.base import BaseCommand
-
 from reconciliation.models import (
     Organization, InvestorEntity, CapitalCall, LineItem,
 )
@@ -18,26 +16,22 @@ class Command(BaseCommand):
             slug="bluebird", defaults={"name": "Bluebird Capital"}
         )
 
-        # --- Northwind investors ---
-        investors = {}
-        for name in [
+        investor_names = [
             "Haller Capital LLC",
             "Rahul Shah Trust",
             "Patel Family Trust",
             "Meridian Partners LP",
             "Oakridge Holdings LLC",
-        ]:
-            inv, _ = InvestorEntity.objects.get_or_create(
-                organization=nw, name=name
-            )
-            investors[name] = inv
+        ]
+        investors = {
+            name: InvestorEntity.objects.get_or_create(organization=nw, name=name)[0]
+            for name in investor_names
+        }
 
-        # --- Bluebird investors ---
         cedar, _ = InvestorEntity.objects.get_or_create(
             organization=bb, name="Cedar Grove Fund LP"
         )
 
-        # --- Northwind capital call #1 ---
         cc1, _ = CapitalCall.objects.update_or_create(
             organization=nw, number=1,
             defaults={"call_date": "2026-03-25", "due_date": "2026-04-10"},
@@ -62,7 +56,6 @@ class Command(BaseCommand):
                 },
             )
 
-        # --- Northwind capital call #2 ---
         cc2, _ = CapitalCall.objects.update_or_create(
             organization=nw, number=2,
             defaults={"call_date": "2026-04-01", "due_date": "2026-04-20"},
@@ -79,7 +72,6 @@ class Command(BaseCommand):
             },
         )
 
-        # --- Bluebird capital call #1 ---
         cc3, _ = CapitalCall.objects.update_or_create(
             organization=bb, number=1,
             defaults={"call_date": "2026-04-01", "due_date": "2026-04-15"},
@@ -96,6 +88,4 @@ class Command(BaseCommand):
             },
         )
 
-        self.stdout.write(self.style.SUCCESS(
-            "Seeded: northwind (2 calls, 6 line items), bluebird (1 call, 1 line item)."
-        ))
+        self.stdout.write(self.style.SUCCESS("Seeded demo data successfully."))

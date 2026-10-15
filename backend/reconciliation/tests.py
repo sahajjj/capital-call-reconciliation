@@ -1,11 +1,11 @@
 import io
 from decimal import Decimal
 
-from django.test import TestCase, override_settings
+from django.test import TestCase
 
 from reconciliation.models import (
     Organization, InvestorEntity, CapitalCall,
-    LineItem, BankTransaction, Match,
+    LineItem, BankTransaction,
 )
 from reconciliation.services.importer import import_csv
 from reconciliation.services.matching import normalise_ref, normalise_name
@@ -13,14 +13,11 @@ from reconciliation.services.actions import approve_match, reject_match, ignore_
 
 
 def make_csv(rows, header="date,description,amount,type,reference"):
-    """Build an in-memory CSV file from a list of row strings."""
     content = header + "\n" + "\n".join(rows)
     return io.BytesIO(content.encode("utf-8"))
 
 
 class BaseTestCase(TestCase):
-    """Sets up two orgs and northwind's line items for every test."""
-
     def setUp(self):
         self.nw = Organization.objects.create(slug="northwind", name="Northwind Ventures")
         self.bb = Organization.objects.create(slug="bluebird", name="Bluebird Capital")
@@ -46,7 +43,6 @@ class BaseTestCase(TestCase):
             call_date="2026-04-01", due_date="2026-04-15",
         )
 
-        # northwind call #1 line items
         self.li_1001 = LineItem.objects.create(
             organization=self.nw, capital_call=self.cc1,
             investor_entity=self.haller, expected_wire_reference="CC-1001",
@@ -72,13 +68,11 @@ class BaseTestCase(TestCase):
             investor_entity=self.oakridge, expected_wire_reference="CC-1005",
             amount_called=Decimal("15000.00"),
         )
-        # northwind call #2
         self.li_1006 = LineItem.objects.create(
             organization=self.nw, capital_call=self.cc2,
             investor_entity=self.oakridge, expected_wire_reference="CC-1006",
             amount_called=Decimal("15000.00"),
         )
-        # bluebird
         self.li_2001 = LineItem.objects.create(
             organization=self.bb, capital_call=self.bb_cc1,
             investor_entity=self.cedar, expected_wire_reference="CC-2001",
@@ -86,11 +80,8 @@ class BaseTestCase(TestCase):
         )
 
 
-# ---- Test 1: Missing column rejects the file ----
-
 class TestMissingColumn(BaseTestCase):
     def test_missing_column_returns_error_saves_nothing(self):
-        # CSV missing the "reference" column
         csv = make_csv(
             ["2026-04-01,Some wire,1000.00,credit"],
             header="date,description,amount,type",
@@ -101,8 +92,6 @@ class TestMissingColumn(BaseTestCase):
         self.assertIn("reference", result["errors"][0]["message"].lower())
         self.assertEqual(BankTransaction.objects.count(), 0)
 
-
-# ---- Test 2: Amount parsing ----
 
 class TestAmountParsing(BaseTestCase):
     def test_thousands_separator_parsed(self):
@@ -149,8 +138,6 @@ class TestAmountParsing(BaseTestCase):
         self.assertEqual(len(result["errors"]), 1)
 
 
-# ---- Test 3: Duplicates ----
-
 class TestDuplicates(BaseTestCase):
     def test_reupload_duplicates_skipped(self):
         csv1 = make_csv([
@@ -159,14 +146,12 @@ class TestDuplicates(BaseTestCase):
         result1 = import_csv(self.nw, csv1)
         self.assertEqual(result1["imported"], 1)
 
-        # upload same file again
         csv2 = make_csv([
             "2026-04-01,WIRE REF CC-1001,27500.00,credit,REF-100",
         ])
         result2 = import_csv(self.nw, csv2)
         self.assertEqual(result2["imported"], 0)
         self.assertEqual(result2["duplicates"], 1)
-        # only one in DB
         self.assertEqual(BankTransaction.objects.filter(bank_reference="REF-100").count(), 1)
 
     def test_duplicate_within_file(self):
@@ -191,11 +176,8 @@ class TestDuplicates(BaseTestCase):
         self.assertEqual(result["duplicates"], 0)
 
 
-# ---- Test 4: Reference matching ----
-
 class TestReferenceMatch(BaseTestCase):
     def test_reference_match_cc1001_lowercase(self):
-        """'cc1001' in description should match CC-1001 after normalisation."""
         csv = make_csv([
             "2026-04-01,WIRE INCOMING REF cc1001,27500.00,credit,WIRE-001",
         ])
@@ -208,7 +190,6 @@ class TestReferenceMatch(BaseTestCase):
         self.assertEqual(matches[0].status, "proposed")
 
     def test_partial_payment(self):
-        """Amount less than remaining is a partial payment match."""
         csv = make_csv([
             "2026-04-01,WIRE INCOMING REF CC-1001,10000.00,credit,WIRE-002",
         ])
@@ -219,7 +200,6 @@ class TestReferenceMatch(BaseTestCase):
         self.assertIn("partial", match.reason.lower())
 
     def test_reference_in_bank_reference_field(self):
-        """Reference found in the bank_reference field, not just description."""
         csv = make_csv([
             "2026-04-01,GENERIC WIRE TRANSFER,12500.00,credit,CC-1003",
         ])
@@ -229,11 +209,8 @@ class TestReferenceMatch(BaseTestCase):
         self.assertEqual(txn.matches.first().line_item, self.li_1003)
 
 
-# ---- Test 5: Name + amount matching ----
-
 class TestNameAmountMatch(BaseTestCase):
     def test_name_amount_match(self):
-        """Name found in description + amount matches remaining -> suggested."""
         csv = make_csv([
             "2026-04-01,WIRE INCOMING PATEL FAMILY TRUST,12500.00,credit,WIRE-010",
         ])
@@ -244,11 +221,6 @@ class TestNameAmountMatch(BaseTestCase):
         self.assertEqual(match.line_item, self.li_1003)
 
     def test_multiple_name_candidates_needs_review(self):
-        """
-        Oakridge has two line items (CC-1005 and CC-1006) both with
-        remaining 15,000. A 15k wire mentioning Oakridge should produce
-        two proposed matches and needs_review.
-        """
         csv = make_csv([
             "2026-04-05,WIRE FROM OAKRIDGE HOLDINGS,15000.00,credit,WIRE-011",
         ])
@@ -258,11 +230,8 @@ class TestNameAmountMatch(BaseTestCase):
         self.assertEqual(txn.matches.filter(status="proposed").count(), 2)
 
 
-# ---- Test 6: Overpayment ----
-
 class TestOverpayment(BaseTestCase):
     def test_overpayment_needs_review_no_match(self):
-        """Amount exceeds remaining on a ref match -> needs_review, no match created."""
         csv = make_csv([
             "2026-04-01,WIRE REF CC-1003,99999.00,credit,WIRE-020",
         ])
@@ -272,8 +241,6 @@ class TestOverpayment(BaseTestCase):
         self.assertIn("overpayment", txn.review_reason.lower())
         self.assertEqual(txn.matches.count(), 0)
 
-
-# ---- Test 7: Approve and double-approve ----
 
 class TestApprove(BaseTestCase):
     def test_approve_updates_funded_amount(self):
@@ -287,18 +254,14 @@ class TestApprove(BaseTestCase):
         result = approve_match(match.pk, self.nw)
         self.assertEqual(result.status, "approved")
 
-        # check line item was updated
         self.li_1003.refresh_from_db()
         self.assertEqual(self.li_1003.amount_funded, Decimal("12500.00"))
         self.assertEqual(self.li_1003.status, "funded")
 
-        # transaction should be reconciled
         txn.refresh_from_db()
         self.assertEqual(txn.status, "reconciled")
 
     def test_double_approve_returns_409(self):
-        """Second approval on same line item should fail with ActionError / 409."""
-        # Both transactions imported before either is approved
         csv = make_csv([
             "2026-04-01,WIRE REF CC-1002,25000.00,credit,WIRE-031",
             "2026-04-01,WIRE REF CC-1002,25000.00,credit,WIRE-032",
@@ -309,18 +272,14 @@ class TestApprove(BaseTestCase):
         self.assertIsNotNone(match1)
         self.assertIsNotNone(match2)
 
-        # First approval succeeds
         approve_match(match1.pk, self.nw)
 
-        # Repeating approval on same match fails
         with self.assertRaises(ActionError):
             approve_match(match1.pk, self.nw)
 
-        # Approving second match fails because remaining is now 0 (overpayment)
         with self.assertRaises(ActionError):
             approve_match(match2.pk, self.nw)
 
-        # Also verify via API view returns HTTP 409 Conflict
         resp = self.client.post(
             f"/api/matches/{match2.pk}/approve/",
             HTTP_X_ORGANIZATION="northwind",
@@ -328,7 +287,6 @@ class TestApprove(BaseTestCase):
         self.assertEqual(resp.status_code, 409)
 
     def test_partial_then_full(self):
-        """Partial payment approved, then the rest — line item goes from partially_funded to funded."""
         csv1 = make_csv([
             "2026-04-01,WIRE REF CC-1001,10000.00,credit,WIRE-040",
         ])
@@ -340,7 +298,6 @@ class TestApprove(BaseTestCase):
         self.assertEqual(self.li_1001.status, "partially_funded")
         self.assertEqual(self.li_1001.amount_funded, Decimal("10000.00"))
 
-        # second partial
         csv2 = make_csv([
             "2026-04-01,WIRE REF CC-1001,17500.00,credit,WIRE-041",
         ])
@@ -352,8 +309,6 @@ class TestApprove(BaseTestCase):
         self.assertEqual(self.li_1001.status, "funded")
         self.assertEqual(self.li_1001.amount_funded, Decimal("27500.00"))
 
-
-# ---- Test 8: Org isolation ----
 
 class TestOrgIsolation(BaseTestCase):
     def test_listing_only_shows_own_org(self):
@@ -374,7 +329,6 @@ class TestOrgIsolation(BaseTestCase):
         import_csv(self.nw, csv)
         match = BankTransaction.objects.get(bank_reference="ORG-ISO-2").matches.first()
 
-        # try to approve using bluebird org -> should return None (404)
         result = approve_match(match.pk, self.bb)
         self.assertIsNone(result)
 
@@ -384,7 +338,6 @@ class TestOrgIsolation(BaseTestCase):
         ])
         import_csv(self.nw, csv)
 
-        # request with northwind header
         resp = self.client.get(
             "/api/transactions/",
             HTTP_X_ORGANIZATION="northwind",
@@ -392,7 +345,6 @@ class TestOrgIsolation(BaseTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.json()), 1)
 
-        # request with bluebird header
         resp = self.client.get(
             "/api/transactions/",
             HTTP_X_ORGANIZATION="bluebird",
@@ -412,8 +364,6 @@ class TestOrgIsolation(BaseTestCase):
         self.assertEqual(resp.status_code, 404)
 
 
-# ---- Normalisation unit tests ----
-
 class TestNormalisation(TestCase):
     def test_normalise_ref(self):
         self.assertEqual(normalise_ref("cc-1003"), "CC1003")
@@ -432,8 +382,6 @@ class TestNormalisation(TestCase):
     def test_normalise_name_handles_extra_punctuation(self):
         self.assertEqual(normalise_name("Foo-Bar, Inc."), "FOO BAR")
 
-
-# ---- Reject / Ignore tests ----
 
 class TestRejectIgnore(BaseTestCase):
     def test_reject_sets_needs_review_when_no_proposed_left(self):
@@ -474,7 +422,6 @@ class TestRejectIgnore(BaseTestCase):
             ignore_transaction(txn.pk, self.nw)
 
     def test_no_match_unknown_wire(self):
-        """An unrecognized wire should end up needs_review with no matches."""
         csv = make_csv([
             "2026-04-01,UNKNOWN INCOMING WIRE,9999.99,credit,WIRE-060",
         ])
