@@ -1,5 +1,3 @@
-/* Reference: logo hard left, links in a centred outlined capsule where each item
-   carries its own soft chip, one white pill CTA hard right. Bar is transparent. */
 .nav {
   position: absolute;
   inset: 0 0 auto;
@@ -14,21 +12,22 @@
 .nav__brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   font-family: var(--font-display);
   font-size: clamp(18px, 1.5vw, 22px);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.025em;
+  color: #ffffff;
 }
 
 .nav__logo { width: 1.3em; height: 1.3em; }
 
 .nav__pill {
   display: none;
-  padding: 5px;
+  padding: 4px;
   border: 1px solid var(--hair);
-  border-radius: 12px;
-  background: rgba(28, 10, 2, 0.34);
+  border-radius: 999px;
+  background: rgba(28, 10, 2, 0.45);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
@@ -36,27 +35,36 @@
 .nav__pill ul {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.nav__pill a {
+.nav__pill button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 13px;
-  border-radius: 8px;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 999px;
   font-size: 13.5px;
-  font-weight: 450;
-  color: rgba(255, 255, 255, 0.82);
-  background: rgba(255, 255, 255, 0.05);
-  transition: background-color 0.3s var(--ease-out), color 0.3s var(--ease-out);
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: transparent;
+  transition: all 0.25s var(--ease-out);
 }
-.nav__pill a:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
 
-.nav__chev { width: 10px; height: 10px; opacity: 0.7; }
+.nav__pill button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nav__pill button.is-active {
+  background: linear-gradient(96deg, var(--flame) 0%, var(--flame-lit) 100%);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(255, 61, 0, 0.35);
+}
 
 .nav__actions { display: flex; align-items: center; gap: 10px; }
 
@@ -80,25 +88,13 @@
   padding: 18px;
   border: 1px solid var(--hair);
   border-radius: 18px;
-  background: rgba(18, 5, 0, 0.94);
+  background: rgba(18, 5, 0, 0.95);
   backdrop-filter: blur(20px);
 }
-.nav__sheet ul { margin: 0 0 14px; padding: 0; list-style: none; display: grid; gap: 2px; }
-.nav__sheet a {
-  display: block;
-  padding: 12px 10px;
-  border-radius: 10px;
-  font-size: 16px;
-  color: rgba(255, 255, 255, 0.86);
-}
-.nav__sheet a:hover { background: rgba(255, 255, 255, 0.07); }
+.nav__sheet ul { margin: 0 0 14px; padding: 0; list-style: none; display: grid; gap: 4px; }
 .nav__sheet-cta { width: 100%; justify-content: center; padding: 0.85em 1.4em; }
 
 @media (min-width: 940px) {
   .nav__pill { display: block; }
   .nav__burger { display: none; }
-}
-
-@media (max-width: 480px) {
-  .nav__cta { display: none; }
 }

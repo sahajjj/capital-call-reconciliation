@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, Globe, partners } from './icons.jsx'
+import { ArrowRight, Globe, Shield, custodians } from './icons.jsx'
 import './Hero.css'
 
-const stats = [
-  { value: '150+', label: 'Projects delivered' },
-  { value: '98%', label: 'Client satisfaction' },
-]
+function formatCurrency(val) {
+  const num = parseFloat(val)
+  if (isNaN(num)) return '$0.00'
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(num)
+}
 
-const bars = [34, 52, 44, 70, 88]
-
-export default function Hero({ onGetStarted }) {
+export default function Hero({ onGetStarted, totalCalled, totalFunded, totalRemaining }) {
   const videoRef = useRef(null)
   const [ready, setReady] = useState(false)
 
@@ -17,7 +19,6 @@ export default function Hero({ onGetStarted }) {
     const video = videoRef.current
     if (!video) return
 
-    // Some browsers block autoplay until the element is explicitly nudged.
     const play = video.play()
     if (play?.catch) play.catch(() => {})
 
@@ -28,7 +29,7 @@ export default function Hero({ onGetStarted }) {
   }, [])
 
   return (
-    <section className="hero">
+    <section className="hero" id="hero">
       <div className="hero__media">
         <video
           ref={videoRef}
@@ -52,87 +53,97 @@ export default function Hero({ onGetStarted }) {
         <div className="hero__lead">
           <p className="hero__note">
             <Globe className="hero__note-icon" />
-            <span>Hub support peoples from<br />all over the world</span>
+            <span>Automated Wire Matching &amp;<br />Capital Call Reconciliation</span>
           </p>
 
           <h1 className="hero__title">
-            Technology<br />
-            Crafted for All<br />
-            Not <em>Machines</em>
+            Private Capital<br />
+            Reconciled in Seconds<br />
+            Not <em>Spreadsheets</em>
           </h1>
 
           <p className="hero__sub">
-            We create clear, intuitive, and accessible digital
-            experiences shaped by real human behavior.
+            FundFlow ingests bank transaction statements, normalises investor entities,
+            and resolves capital calls with row-level atomic locking and audit-ready precision.
           </p>
 
           <div className="hero__cta">
-            <a
+            <button
+              type="button"
               className="btn btn--flame hero__go"
-              href="#portal"
-              onClick={(e) => {
-                if (onGetStarted) {
-                  e.preventDefault();
-                  onGetStarted();
-                }
-              }}
+              onClick={onGetStarted}
             >
-              Get started
+              Reconcile Statements
               <span className="hero__go-dot" aria-hidden="true"><ArrowRight /></span>
-            </a>
+            </button>
 
             <div className="hero__proof">
               <div className="hero__faces" aria-hidden="true">
                 <i style={{ '--a': '#ff7a3d', '--b': '#ffb27a' }} />
                 <i style={{ '--a': '#6f4bd8', '--b': '#a98cff' }} />
                 <i style={{ '--a': '#1f9ea8', '--b': '#63d6df' }} />
-                <i style={{ '--a': '#d8434b', '--b': '#ff8a8f' }} />
+                <i style={{ '--a': '#10b981', '--b': '#34d399' }} />
               </div>
               <span className="hero__proof-text">
-                <strong>650+ Happy Clients</strong>
-                Live Support
+                <strong>Row-Level Locking</strong>
+                Zero Double Funding
               </span>
             </div>
           </div>
 
           <ul className="hero__stats">
-            {stats.map((stat) => (
-              <li key={stat.label} className="stat">
-                <span className="stat__mark" aria-hidden="true">*</span>
-                <span className="stat__value">{stat.value}</span>
-                <span className="stat__label">{stat.label}</span>
-                <span className="stat__rule" aria-hidden="true" />
-              </li>
-            ))}
+            <li className="stat">
+              <span className="stat__mark" aria-hidden="true">*</span>
+              <span className="stat__value">{formatCurrency(totalCalled)}</span>
+              <span className="stat__label">Total Capital Called</span>
+              <span className="stat__rule" aria-hidden="true" />
+            </li>
+            <li className="stat">
+              <span className="stat__mark" aria-hidden="true">*</span>
+              <span className="stat__value" style={{ color: '#34d399' }}>{formatCurrency(totalFunded)}</span>
+              <span className="stat__label">Total Funded to Date</span>
+              <span className="stat__rule" aria-hidden="true" />
+            </li>
+            <li className="stat">
+              <span className="stat__mark" aria-hidden="true">*</span>
+              <span className="stat__value" style={{ color: '#ff8a1f' }}>{formatCurrency(totalRemaining)}</span>
+              <span className="stat__label">Target Remaining</span>
+              <span className="stat__rule" aria-hidden="true" />
+            </li>
           </ul>
         </div>
 
         <aside className="hero__ghost" aria-hidden="true">
           <div className="ghost__row">
             <div className="ghost__bars">
-              {bars.map((h, i) => (
-                <span key={i} style={{ height: `${h}%` }} />
-              ))}
+              <span style={{ height: '34%' }} />
+              <span style={{ height: '52%' }} />
+              <span style={{ height: '44%' }} />
+              <span style={{ height: '70%' }} />
+              <span style={{ height: '94%' }} />
             </div>
-            <p className="ghost__kpi"><strong>+42%</strong>Experience<br />Performance</p>
+            <p className="ghost__kpi">
+              <strong>100%</strong>
+              Precision Match<br />Engine
+            </p>
           </div>
-          <h2 className="ghost__title">Measure Real Impact</h2>
+          <h2 className="ghost__title">Audit-Ready Safety</h2>
           <p className="ghost__copy">
-            We track user response through meaningful metrics and
-            refine every detail until the experience feels effortless.
+            Every incoming wire credit runs through deterministic two-tier matching:
+            exact reference extraction first, falling back to corporate name entity normalisation.
           </p>
         </aside>
       </div>
 
       <div className="hero__foot">
-        <span className="hero__watermark" aria-hidden="true">AIM</span>
+        <span className="hero__watermark" aria-hidden="true">CAPITAL</span>
         <div className="hero__partners">
-          <span className="hero__partners-label">Our Partners</span>
+          <span className="hero__partners-label">Supported Custodians &amp; Networks</span>
           <ul>
-            {partners.map((partner) => (
-              <li key={partner.name}>
-                {partner.mark}
-                <span>{partner.name}</span>
+            {custodians.map((c) => (
+              <li key={c.name}>
+                {c.mark}
+                <span>{c.name}</span>
               </li>
             ))}
           </ul>

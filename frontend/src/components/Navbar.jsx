@@ -1,57 +1,48 @@
-import { useEffect, useState } from 'react'
-import { Chevron, Close, Logo, Menu } from './icons.jsx'
+import { useState } from 'react'
+import { Close, Logo, Menu, Building } from './icons.jsx'
 import './Navbar.css'
 
-const links = [
-  { label: 'Reconciliation', hasMenu: false, href: '#portal' },
-  { label: 'Features', hasMenu: true },
-  { label: 'How It Works' },
-  { label: 'About' },
-  { label: 'Blogs' },
+const ORGANIZATIONS = [
+  { slug: 'northwind', name: 'Northwind Ventures' },
+  { slug: 'bluebird', name: 'Bluebird Capital' },
 ]
 
-export default function Navbar({ onGetStarted }) {
+export default function Navbar({ selectedOrg, onSelectOrg, onImportClick }) {
   const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [open])
-
-  const handleCta = (e) => {
-    if (onGetStarted) {
-      e.preventDefault()
-      onGetStarted()
-    }
-  }
 
   return (
     <header className="nav">
-      <a className="nav__brand" href="#main">
+      <a className="nav__brand" href="#hero">
         <Logo className="nav__logo" />
-        <span>Fluxora</span>
+        <span>FundFlow</span>
       </a>
 
-      <nav className="nav__pill" aria-label="Primary">
+      <div className="nav__pill" aria-label="Tenant switcher">
         <ul>
-          {links.map((link) => (
-            <li key={link.label}>
-              <a
-                href={link.href || '#main'}
-                onClick={link.href === '#portal' ? handleCta : undefined}
+          {ORGANIZATIONS.map((org) => (
+            <li key={org.slug}>
+              <button
+                type="button"
+                id={`nav-org-${org.slug}`}
+                className={selectedOrg === org.slug ? 'is-active' : ''}
+                onClick={() => onSelectOrg(org.slug)}
               >
-                {link.label}
-                {link.hasMenu && <Chevron className="nav__chev" />}
-              </a>
+                <Building style={{ width: 14, height: 14 }} />
+                <span>{org.name}</span>
+              </button>
             </li>
           ))}
         </ul>
-      </nav>
+      </div>
 
       <div className="nav__actions">
-        <a className="btn btn--light nav__cta" href="#portal" onClick={handleCta}>
-          Get Started
-        </a>
+        <button
+          type="button"
+          className="btn btn--light nav__cta"
+          onClick={onImportClick}
+        >
+          Import Statement
+        </button>
         <button
           className="nav__burger"
           type="button"
@@ -65,31 +56,42 @@ export default function Navbar({ onGetStarted }) {
 
       {open && (
         <div className="nav__sheet">
+          <div style={{ padding: '4px 10px 10px', fontSize: '11px', textTransform: 'uppercase', color: 'var(--ink-faint)', letterSpacing: '0.05em' }}>
+            Select Active Fund
+          </div>
           <ul>
-            {links.map((link) => (
-              <li key={link.label}>
-                <a
-                  href={link.href || '#main'}
-                  onClick={(e) => {
+            {ORGANIZATIONS.map((org) => (
+              <li key={org.slug}>
+                <button
+                  type="button"
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: selectedOrg === org.slug ? 'rgba(255, 61, 0, 0.2)' : 'transparent',
+                    color: selectedOrg === org.slug ? '#fff' : 'var(--ink-soft)'
+                  }}
+                  onClick={() => {
+                    onSelectOrg(org.slug)
                     setOpen(false)
-                    if (link.href === '#portal') handleCta(e)
                   }}
                 >
-                  {link.label}
-                </a>
+                  {org.name}
+                </button>
               </li>
             ))}
           </ul>
-          <a
+          <button
+            type="button"
             className="btn btn--flame nav__sheet-cta"
-            href="#portal"
-            onClick={(e) => {
+            onClick={() => {
               setOpen(false)
-              handleCta(e)
+              onImportClick()
             }}
           >
-            Get Started
-          </a>
+            Import Statement
+          </button>
         </div>
       )}
     </header>

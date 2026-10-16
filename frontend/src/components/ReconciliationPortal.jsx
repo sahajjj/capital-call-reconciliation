@@ -1,12 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
-import {
-  fetchTransactions,
-  fetchLineItems,
-  uploadCSV,
-  approveMatch,
-  rejectMatch,
-  ignoreTransaction,
-} from "../api";
+import React from "react";
 import "./ReconciliationPortal.css";
 
 const ORGANIZATIONS = [
@@ -23,116 +15,30 @@ function formatCurrency(val) {
   }).format(num);
 }
 
-export default function ReconciliationPortal() {
-  const [selectedOrg, setSelectedOrg] = useState("northwind");
-  const [transactions, setTransactions] = useState([]);
-  const [lineItems, setLineItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [errorBanner, setErrorBanner] = useState("");
-
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState(null);
-
-  const [activeActions, setActiveActions] = useState(new Set());
-
-  const setActionRunning = (actionKey, isRunning) => {
-    setActiveActions((prev) => {
-      const next = new Set(prev);
-      if (isRunning) next.add(actionKey);
-      else next.delete(actionKey);
-      return next;
-    });
-  };
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setErrorBanner("");
-    try {
-      const [txns, items] = await Promise.all([
-        fetchTransactions(selectedOrg),
-        fetchLineItems(selectedOrg),
-      ]);
-      setTransactions(txns);
-      setLineItems(items);
-    } catch (err) {
-      setErrorBanner(err.message || "Failed to load organization data.");
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedOrg]);
-
-  useEffect(() => {
-    setUploadResult(null);
-    setSelectedFile(null);
-    loadData();
-  }, [loadData]);
-
-  const handleUpload = async (e) => {
-    e.preventDefault();
-    if (!selectedFile) return;
-
-    setUploading(true);
-    setErrorBanner("");
-    try {
-      const { data } = await uploadCSV(selectedOrg, selectedFile);
-      setUploadResult(data);
-      setSelectedFile(null);
-      const fileInput = document.getElementById("portal-csv-file-input");
-      if (fileInput) fileInput.value = "";
-      await loadData();
-    } catch (err) {
-      setErrorBanner(err.message || "CSV upload failed.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleApprove = async (matchId) => {
-    const key = `approve-${matchId}`;
-    setActionRunning(key, true);
-    setErrorBanner("");
-    try {
-      await approveMatch(selectedOrg, matchId);
-      await loadData();
-    } catch (err) {
-      setErrorBanner(err.message || "Approval failed.");
-    } finally {
-      setActionRunning(key, false);
-    }
-  };
-
-  const handleReject = async (matchId) => {
-    const key = `reject-${matchId}`;
-    setActionRunning(key, true);
-    setErrorBanner("");
-    try {
-      await rejectMatch(selectedOrg, matchId);
-      await loadData();
-    } catch (err) {
-      setErrorBanner(err.message || "Rejection failed.");
-    } finally {
-      setActionRunning(key, false);
-    }
-  };
-
-  const handleIgnore = async (txnId) => {
-    const key = `ignore-${txnId}`;
-    setActionRunning(key, true);
-    setErrorBanner("");
-    try {
-      await ignoreTransaction(selectedOrg, txnId);
-      await loadData();
-    } catch (err) {
-      setErrorBanner(err.message || "Ignore failed.");
-    } finally {
-      setActionRunning(key, false);
-    }
-  };
-
-  const totalCalled = lineItems.reduce((acc, li) => acc + parseFloat(li.amount_called || 0), 0);
-  const totalFunded = lineItems.reduce((acc, li) => acc + parseFloat(li.amount_funded || 0), 0);
-  const totalRemaining = totalCalled - totalFunded;
+export default function ReconciliationPortal({
+  selectedOrg,
+  onSelectOrg,
+  transactions,
+  lineItems,
+  loading,
+  errorBanner,
+  setErrorBanner,
+  selectedFile,
+  setSelectedFile,
+  uploading,
+  uploadResult,
+  setUploadResult,
+  activeActions,
+  handleUpload,
+  handleApprove,
+  handleReject,
+  handleIgnore,
+  loadData,
+  totalCalled,
+  totalFunded,
+  totalRemaining,
+}) {
+  const fundedPercent = totalCalled > 0 ? Math.round((totalFunded / totalCalled) * 100) : 0;
 
   return (
     <section id="portal" className="recon-section">
@@ -152,7 +58,7 @@ export default function ReconciliationPortal() {
                 key={org.slug}
                 id={`org-btn-${org.slug}`}
                 className={`org-tab-btn ${selectedOrg === org.slug ? "active" : ""}`}
-                onClick={() => setSelectedOrg(org.slug)}
+                onClick={() => onSelectOrg(org.slug)}
               >
                 {org.name}
               </button>
@@ -183,12 +89,30 @@ export default function ReconciliationPortal() {
             <div className="stat-pill-num">{formatCurrency(totalCalled)}</div>
           </div>
           <div className="stat-pill">
-            <div className="stat-pill-label">Total Funded Amount</div>
+            <div className="stat-pill-label">Total Funded to Date</div>
             <div className="stat-pill-num" style={{ color: "#34d399" }}>{formatCurrency(totalFunded)}</div>
           </div>
           <div className="stat-pill">
             <div className="stat-pill-label">Remaining Target Balance</div>
             <div className="stat-pill-num" style={{ color: "#ff8a1f" }}>{formatCurrency(totalRemaining)}</div>
+          </div>
+          <div className="stat-pill">
+            <div className="stat-pill-label">Funded Progress</div>
+            <div className="stat-pill-num" style={{ color: "#a5b4fc" }}>{fundedPercent}%</div>
+            <div style={{
+              height: 6,
+              background: "rgba(255, 255, 255, 0.08)",
+              borderRadius: 3,
+              overflow: "hidden",
+              marginTop: 10
+            }}>
+              <div style={{
+                width: `${fundedPercent}%`,
+                height: "100%",
+                background: "linear-gradient(90deg, #ff3d00, #10b981)",
+                transition: "width 0.4s ease"
+              }} />
+            </div>
           </div>
         </div>
 
@@ -284,36 +208,46 @@ export default function ReconciliationPortal() {
             </span>
           </div>
 
-          <div style={{ overflowX: "auto" }}>
-            <table className="recon-table">
-              <thead>
-                <tr>
-                  <th>Investor Entity</th>
-                  <th>Call #</th>
-                  <th>Expected Wire Ref</th>
-                  <th>Called</th>
-                  <th>Funded</th>
-                  <th>Remaining</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lineItems.map((item) => (
-                  <tr key={item.id}>
-                    <td style={{ fontWeight: 600, color: "#fff" }}>{item.investor}</td>
-                    <td><span className="badge-status badge-open">Call #{item.capital_call_number}</span></td>
-                    <td style={{ fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{item.expected_wire_reference}</td>
-                    <td style={{ fontFamily: "var(--font-mono)" }}>{formatCurrency(item.amount_called)}</td>
-                    <td style={{ fontFamily: "var(--font-mono)", color: "#34d399" }}>{formatCurrency(item.amount_funded)}</td>
-                    <td style={{ fontFamily: "var(--font-mono)", color: parseFloat(item.amount_remaining) > 0 ? "var(--flame-lit)" : "var(--ink-faint)" }}>
-                      {formatCurrency(item.amount_remaining)}
-                    </td>
-                    <td><span className={`badge-status badge-${item.status}`}>{item.status.replace("_", " ")}</span></td>
+          {loading ? (
+            <div style={{ padding: "36px", textAlign: "center", color: "var(--ink-faint)" }}>
+              Loading line items...
+            </div>
+          ) : lineItems.length === 0 ? (
+            <div style={{ padding: "36px", textAlign: "center", color: "var(--ink-faint)" }}>
+              No line items found for this fund.
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="recon-table">
+                <thead>
+                  <tr>
+                    <th>Investor Entity</th>
+                    <th>Call #</th>
+                    <th>Expected Wire Ref</th>
+                    <th>Called</th>
+                    <th>Funded</th>
+                    <th>Remaining</th>
+                    <th>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {lineItems.map((item) => (
+                    <tr key={item.id} id={`line-item-row-${item.id}`}>
+                      <td style={{ fontWeight: 600, color: "#fff" }}>{item.investor}</td>
+                      <td><span className="badge-status badge-open">Call #{item.capital_call_number}</span></td>
+                      <td style={{ fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{item.expected_wire_reference}</td>
+                      <td style={{ fontFamily: "var(--font-mono)" }}>{formatCurrency(item.amount_called)}</td>
+                      <td style={{ fontFamily: "var(--font-mono)", color: "#34d399" }}>{formatCurrency(item.amount_funded)}</td>
+                      <td style={{ fontFamily: "var(--font-mono)", color: parseFloat(item.amount_remaining) > 0 ? "var(--flame-lit)" : "var(--ink-faint)" }}>
+                        {formatCurrency(item.amount_remaining)}
+                      </td>
+                      <td><span className={`badge-status badge-${item.status}`}>{item.status.replace("_", " ")}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         <div className="recon-card" id="transactions-section">
@@ -350,7 +284,7 @@ export default function ReconciliationPortal() {
                     const isIgnoreRunning = activeActions.has(`ignore-${txn.id}`);
 
                     return (
-                      <tr key={txn.id}>
+                      <tr key={txn.id} id={`txn-row-${txn.id}`}>
                         <td style={{ fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>{txn.date}</td>
                         <td>
                           <div style={{ fontWeight: 550, color: "#fff" }}>{txn.description}</div>
@@ -370,7 +304,7 @@ export default function ReconciliationPortal() {
                               const isProposed = match.status === "proposed";
 
                               return (
-                                <div key={match.id} className="match-box">
+                                <div key={match.id} className="match-box" id={`match-item-${match.id}`}>
                                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
                                     <strong style={{ color: "#fff" }}>{match.investor}</strong>
                                     <span style={{ color: "var(--flame-lit)", fontFamily: "var(--font-mono)" }}>{match.reference}</span>
