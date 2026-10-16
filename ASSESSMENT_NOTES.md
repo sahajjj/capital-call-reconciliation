@@ -32,17 +32,17 @@ python manage.py runserver
 ```bash
 cd ../frontend
 npm install
-npm run dev
-# Starts Vite dev server at http://localhost:5173 with proxy to Django /api
+npm run dev   # On Windows PowerShell if script execution is restricted, use: npm.cmd run dev
+# Starts Vite dev server at http://localhost:5173 (or 5174 if 5173 is occupied) with proxy to Django /api
 ```
 
-Open `http://localhost:5173` in your browser. You can immediately upload the CSV files in `demo_data/` to test both Northwind Ventures and Bluebird Capital.
+Open `http://localhost:5173` (or `http://localhost:5174`) in your browser. You can immediately upload the CSV files in `demo_data/` to test both Northwind Ventures and Bluebird Capital.
 
 ---
 
 ## 2. Test Suite Command
 
-Run all 33 tests with one single command from `backend/`:
+Run all 35 tests with one single command from `backend/`:
 
 ```bash
 python manage.py test
@@ -52,11 +52,12 @@ python manage.py test
 1. **Missing CSV columns:** Rejects file, returns 400 with line 1 detail, stores nothing.
 2. **Amount parsing:** Handles comma thousands separators (`"27,500.00"`), verifies Decimal precision, flags invalid dates, zero amounts, and sign/type mismatches.
 3. **Duplicate detection:** Skips duplicate references inside the same file and across prior imports for that organization. Confirms distinct organizations can safely share identical bank references.
-4. **Reference matching:** Handles case-insensitivity and punctuation normalisation (e.g. `cc1001` matches `CC-1001`), identifies partial payments vs full payments.
-5. **Name + amount matching:** Normalises corporate suffixes (`LLC`, `LP`, etc.), retains `TRUST`, performs whole-word boundary matching. Handles multiple candidate collision cleanly into `needs_review`.
+4. **Reference matching:** Handles case-insensitivity and punctuation normalisation (e.g. `cc1001` matches `CC-1001`), identifies partial payments vs full payments. Guards against empty or punctuation-only false matches.
+5. **Name + amount matching:** Normalises corporate suffixes (`LLC`, `LP`, etc.), retains `TRUST`, performs whole-word boundary matching. Guards against suffix-only collision (e.g. entity named `"LLC"`). Handles multiple candidate collision cleanly into `needs_review`.
 6. **Overpayment safeguard:** Wires exceeding remaining balance are marked `needs_review` with no match created.
 7. **Concurrency & idempotency:** `approve_match` uses `select_for_update()`; duplicate or competing approval calls return HTTP 409 Conflict with zero double-funding.
 8. **Tenant isolation:** Strict scoping by `X-Organization` header. Cross-tenant access returns 404 (never 403 or leaking other tenants' data).
+9. **Atomic Ingestion:** Wraps bulk transaction insertion and matching within an atomic transaction to ensure zero half-imported records.
 
 ---
 

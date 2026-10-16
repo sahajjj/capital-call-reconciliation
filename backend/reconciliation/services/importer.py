@@ -13,19 +13,30 @@ REQUIRED_COLUMNS = {"date", "description", "amount", "type", "reference"}
 
 
 def import_csv(org, file_obj):
-    text = file_obj.read().decode("utf-8-sig")
+    raw = file_obj.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1", errors="replace")
+
     reader = csv.DictReader(io.StringIO(text))
 
     if reader.fieldnames is None:
-        return {"imported": 0, "duplicates": 0, "errors": [{"line": 1, "message": "Empty file or missing header row."}]}
+        return {
+            "imported": 0,
+            "duplicates": 0,
+            "errors": [{"line": 1, "message": "Empty file or missing header row."}],
+            "rejected": True,
+        }
 
-    cleaned_fields = {f.strip().lower() for f in reader.fieldnames}
+    cleaned_fields = {f.strip().lower() for f in reader.fieldnames if f}
     missing = REQUIRED_COLUMNS - cleaned_fields
     if missing:
         return {
             "imported": 0,
             "duplicates": 0,
             "errors": [{"line": 1, "message": f"Missing columns: {', '.join(sorted(missing))}"}],
+            "rejected": True,
         }
 
     existing_refs = set(
@@ -63,7 +74,7 @@ def import_csv(org, file_obj):
             errors.append({"line": line_num, "message": "Description is required."})
             continue
 
-        amount_str = row.get("amount", "").replace(",", "")
+        amount_str = row.get("amount", "").replace(",", "").replace("$", "").strip()
         try:
             amount = Decimal(amount_str)
         except (InvalidOperation, ValueError):
@@ -102,10 +113,9 @@ def import_csv(org, file_obj):
 
     with transaction.atomic():
         BankTransaction.objects.bulk_create(rows_to_create)
-
-    for txn in rows_to_create:
-        if txn.type == "credit":
-            run_matching(txn)
+        for txn in rows_to_create:
+            if txn.type == "credit":
+                run_matching(txn)
 
     return {
         "imported": len(rows_to_create),

@@ -43,7 +43,7 @@ class TransactionImportView(APIView):
 
         result = import_csv(request.org, csv_file)
 
-        if result["imported"] == 0 and result["errors"]:
+        if result.get("rejected"):
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(result, status=status.HTTP_200_OK)

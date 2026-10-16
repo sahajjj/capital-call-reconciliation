@@ -46,8 +46,11 @@ def run_matching(txn):
 
     ref_matches = [
         li for li in eligible
-        if normalise_ref(li.expected_wire_reference) in norm_desc
-        or normalise_ref(li.expected_wire_reference) in norm_bank_ref
+        if normalise_ref(li.expected_wire_reference)
+        and (
+            normalise_ref(li.expected_wire_reference) in norm_desc
+            or normalise_ref(li.expected_wire_reference) in norm_bank_ref
+        )
     ]
 
     if ref_matches:
@@ -84,6 +87,7 @@ def run_matching(txn):
     name_matches = [
         li for li in eligible
         if li.amount_remaining == txn.amount
+        and normalise_name(li.investor_entity.name)
         and name_found_in(normalise_name(li.investor_entity.name), norm_desc_for_name)
     ]
 

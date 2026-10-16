@@ -438,3 +438,41 @@ class TestRejectIgnore(BaseTestCase):
         txn = BankTransaction.objects.get(bank_reference="DEBIT-001")
         self.assertEqual(txn.type, "debit")
         self.assertEqual(txn.status, "ignored")
+
+
+class TestMatchingEdgeCases(BaseTestCase):
+    def test_blank_reference_does_not_match(self):
+        LineItem.objects.create(
+            organization=self.nw,
+            capital_call=self.cc1,
+            investor_entity=self.haller,
+            expected_wire_reference="",
+            amount_called=Decimal("5000.00"),
+        )
+        csv = make_csv([
+            "2026-04-01,SOME WIRE WITH NO REF,5000.00,credit,EDGE-REF-1",
+        ])
+        import_csv(self.nw, csv)
+        txn = BankTransaction.objects.get(bank_reference="EDGE-REF-1")
+        self.assertEqual(
+            txn.matches.filter(line_item__expected_wire_reference="").count(), 0
+        )
+
+    def test_suffix_only_entity_name_does_not_false_match(self):
+        llc_entity = InvestorEntity.objects.create(organization=self.nw, name="LLC")
+        LineItem.objects.create(
+            organization=self.nw,
+            capital_call=self.cc1,
+            investor_entity=llc_entity,
+            expected_wire_reference="CC-SPECIAL",
+            amount_called=Decimal("3000.00"),
+        )
+        csv = make_csv([
+            "2026-04-01,WIRE TRANSFER FROM SOMEONE ELSE,3000.00,credit,EDGE-NAME-1",
+        ])
+        import_csv(self.nw, csv)
+        txn = BankTransaction.objects.get(bank_reference="EDGE-NAME-1")
+        self.assertEqual(
+            txn.matches.filter(line_item__investor_entity=llc_entity).count(), 0
+        )
+
